@@ -1,0 +1,9 @@
+[package]
+name = "Howl"
+version = "0.1.0"
+authors = ["Bibhas Bhattacharya <bibhas2@gmail.com>"]
+
+[dependencies]
+user32-sys = "*"
+kernel32-sys = "*"
+winapi = "*"
