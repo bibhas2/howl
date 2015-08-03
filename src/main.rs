@@ -60,15 +60,126 @@ pub unsafe fn create_window(exStyle : winapi::DWORD, style : winapi::DWORD, clas
     window
 }
 
+pub struct WindowBuilder<'a> {
+	x: i32,
+	y: i32,
+	width: i32,
+	height: i32,
+	style: winapi::DWORD,
+	extra_style: winapi::DWORD,
+	class_name: &'a str,
+	title: &'a str,
+	parent: winapi::HWND
+}
+
+impl <'a> WindowBuilder<'a> {
+	pub fn new() -> WindowBuilder<'a> {
+		WindowBuilder {
+			x: winapi::CW_USEDEFAULT,
+			y: winapi::CW_USEDEFAULT,
+			width: winapi::CW_USEDEFAULT,
+			height: winapi::CW_USEDEFAULT,
+			style: 0,
+			extra_style: 0,
+			class_name: "",
+			title: "",
+			parent: 0 as winapi::HWND
+		}
+	}
+	pub fn style(&'a mut self, style: winapi::DWORD) -> &mut WindowBuilder {
+		self.style = style;
+		
+		self
+	}
+	pub fn extra_style(&'a mut self, extra_style: winapi::DWORD) -> &mut WindowBuilder {
+		self.extra_style = extra_style;
+		
+		self
+	}
+	pub fn parent(&'a mut self, parent: winapi::HWND) -> &mut WindowBuilder {
+		self.parent = parent;
+		
+		self
+	}
+	pub fn position(&'a mut self, x: i32, y: i32) -> &mut WindowBuilder {
+		self.x = x;
+		self.y = y;
+		
+		self
+	}
+	pub fn size(&'a mut self, width: i32, height: i32) -> &mut WindowBuilder {
+		self.width = width;
+		self.height = height;
+		
+		self
+	}
+	pub fn class_name(&'a mut self, class_name: &'a str) -> &mut WindowBuilder {
+		self.class_name = class_name;
+		
+		self
+	}
+	pub fn title(&'a mut self, title: &'a str) -> &mut WindowBuilder {
+		self.title = title;
+		
+		self
+	}
+	
+	pub fn button(&'a mut self, title: &'a str) -> &mut WindowBuilder {
+		self.title(title)
+		.class_name("BUTTON")
+		.style(winapi::WS_VISIBLE | winapi::WS_TABSTOP | winapi::WS_CHILD | winapi::BS_PUSHBUTTON)
+	}
+	
+	pub fn checkbox(&'a mut self, title: &'a str) -> &mut WindowBuilder {
+		self.title(title)
+		.class_name("BUTTON")
+		.style(winapi::WS_VISIBLE | winapi::WS_TABSTOP | winapi::WS_CHILD | winapi::BS_CHECKBOX)
+	}
+
+	pub fn create(&self) -> winapi::HWND {		
+		unsafe {
+		    let window =  user32::CreateWindowExW(
+		        self.extra_style,
+		        to_wchar(self.class_name).as_ptr(),
+		        to_wchar(self.title).as_ptr(),
+		        self.style,
+		        self.x,
+		        self.y,
+		        self.width,
+		        self.height,
+		        self.parent,
+		        ptr::null_mut(),
+		        get_instance(),
+		        ptr::null_mut());
+				
+		    if window.is_null() {
+		        panic!("CreateWindowExW error: {}", kernel32::GetLastError());
+		    }
+		
+		    window	
+		}
+	}
+}
+
 fn main() {
 	unsafe {
 		let class_name = "HOWL";
 		register_class(class_name, Some(user32::DefWindowProcW));
 		
-	    let wnd = create_window(winapi::WS_EX_CLIENTEDGE, 
-			winapi::WS_THICKFRAME | winapi::WS_MINIMIZEBOX | winapi::WS_MAXIMIZEBOX | winapi::WS_SYSMENU, 
-			class_name,
-			"Hello World");
+		let wnd = WindowBuilder::new()
+			.class_name("HOWL")
+			.size(500, 500)
+			.title("Cool World")
+			.style(winapi::WS_THICKFRAME | winapi::WS_MINIMIZEBOX | winapi::WS_MAXIMIZEBOX | winapi::WS_SYSMENU)
+			.extra_style(winapi::WS_EX_CLIENTEDGE)
+			.create();
+		
+		let btn = WindowBuilder::new()
+			.checkbox("Press me")
+			.position(10, 10)
+			.size(95, 50)
+			.parent(wnd)
+			.create();
 
 		user32::ShowWindow(wnd, 5);
 		
