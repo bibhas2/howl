@@ -47,7 +47,8 @@ pub struct WindowBuilder<'a> {
 	extra_style: winapi::DWORD,
 	class_name: &'a str,
 	title: &'a str,
-	parent: winapi::HWND
+	parent: winapi::HWND,
+	id: u16
 }
 
 impl <'a> WindowBuilder<'a> {
@@ -61,7 +62,8 @@ impl <'a> WindowBuilder<'a> {
 			extra_style: 0,
 			class_name: "",
 			title: "",
-			parent: 0 as winapi::HWND
+			parent: 0 as winapi::HWND,
+			id: 0
 		}
 	}
 	pub fn style(&'a mut self, style: winapi::DWORD) -> &mut WindowBuilder {
@@ -91,6 +93,13 @@ impl <'a> WindowBuilder<'a> {
 		
 		self
 	}
+	
+	pub fn id(&'a mut self, id: u16) -> &mut WindowBuilder {
+		self.id = id;
+		
+		self
+	}
+
 	pub fn class_name(&'a mut self, class_name: &'a str) -> &mut WindowBuilder {
 		self.class_name = class_name;
 		
@@ -114,6 +123,13 @@ impl <'a> WindowBuilder<'a> {
 		.style(winapi::WS_VISIBLE | winapi::WS_TABSTOP | winapi::WS_CHILD | winapi::BS_CHECKBOX)
 	}
 
+	pub fn frame(&'a mut self, title: &'a str) -> &mut WindowBuilder {
+		self.title(title)
+		.class_name("HOWL")
+		.style(winapi::WS_THICKFRAME | winapi::WS_MINIMIZEBOX | winapi::WS_MAXIMIZEBOX | winapi::WS_SYSMENU)
+		.extra_style(winapi::WS_EX_CLIENTEDGE)
+	}
+
 	pub fn create(&self) -> winapi::HWND {		
 		unsafe {
 		    let window =  user32::CreateWindowExW(
@@ -126,7 +142,7 @@ impl <'a> WindowBuilder<'a> {
 		        self.width,
 		        self.height,
 		        self.parent,
-		        ptr::null_mut(),
+		        self.id as winapi::HMENU,
 		        get_instance(),
 		        ptr::null_mut());
 				
@@ -159,6 +175,32 @@ pub trait Window {
 			user32::SendMessageW(self.get_hwnd(), winapi::WM_SETTEXT, 0, to_wchar(txt).as_ptr() as winapi::LPARAM);
 		}
 	}
+	
+	fn on_command(&self, source_id: u16, command_type: u16) {
+		println!("Window got command from: {}.", source_id);
+	}
+	
+	fn on_size(&self, width: u16, height: u16) {
+		println!("Window resized. {} {}.", width, height);
+	}
+
+	fn on_event(&self, message : winapi::UINT,  w_param : winapi::WPARAM,  l_param : winapi::LPARAM) -> bool {
+		//println!("Message received: {}", message);
+		
+		match message {
+			winapi::WM_SIZE => {
+				self.on_size(winapi::LOWORD(l_param as winapi::DWORD), winapi::HIWORD(l_param as winapi::DWORD));
+				return true;
+			},
+			winapi::WM_COMMAND => {
+				self.on_command(winapi::LOWORD(w_param as winapi::DWORD), winapi::HIWORD(w_param as winapi::DWORD));
+				return true;
+			},
+			_ => {
+				return false;
+			}
+		}
+	}
 }
 
 impl Window for winapi::HWND {
@@ -167,17 +209,27 @@ impl Window for winapi::HWND {
 	}
 }
 
+unsafe extern "system" fn wnd_proc(
+    window: winapi::HWND,
+    message: winapi::UINT,
+    w_param: winapi::WPARAM,
+    l_param: winapi::LPARAM) -> winapi::LRESULT {
+	
+    if window.on_event(message, w_param, l_param) {
+		return 0;
+	}
+	
+    return user32::DefWindowProcW(window, message, w_param, l_param);
+}
+
 fn main() {
 	unsafe {
 		let class_name = "HOWL";
-		register_class(class_name, Some(user32::DefWindowProcW));
+		register_class(class_name, Some(wnd_proc));
 		
 		let wnd = WindowBuilder::new()
-			.class_name("HOWL")
+			.frame("Cool World")
 			.size(500, 500)
-			.title("Cool World")
-			.style(winapi::WS_THICKFRAME | winapi::WS_MINIMIZEBOX | winapi::WS_MAXIMIZEBOX | winapi::WS_SYSMENU)
-			.extra_style(winapi::WS_EX_CLIENTEDGE)
 			.create();
 		
 		let btn = WindowBuilder::new()
@@ -185,6 +237,7 @@ fn main() {
 			.position(10, 10)
 			.size(95, 50)
 			.parent(wnd)
+			.id(10)
 			.create();
 		
 		//user32::ShowWindow(wnd, 5);
