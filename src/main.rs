@@ -38,28 +38,6 @@ unsafe fn register_class(class_name : &str, wnd_proc: winapi::WNDPROC) {
     }
 }
 
-pub unsafe fn create_window(exStyle : winapi::DWORD, style : winapi::DWORD, class_name : &str, title: &str) -> winapi::HWND {
-    let window = user32::CreateWindowExW(
-        exStyle,
-        to_wchar(class_name).as_ptr(),
-        to_wchar(title).as_ptr(),
-        style,
-        0,
-        0,
-        100,
-        100,
-        ptr::null_mut(),
-        ptr::null_mut(),
-        get_instance(),
-        ptr::null_mut());
-		
-    if window.is_null() {
-        panic!("CreateWindowExW error: {}", kernel32::GetLastError());
-    }
-
-    window
-}
-
 pub struct WindowBuilder<'a> {
 	x: i32,
 	y: i32,
@@ -161,6 +139,34 @@ impl <'a> WindowBuilder<'a> {
 	}
 }
 
+pub trait Window {
+	fn get_hwnd(&self) -> winapi::HWND;
+	
+	fn show(&self) {
+		unsafe {
+			user32::ShowWindow(self.get_hwnd(), 5);
+		}
+	}
+
+	fn hide(&self) {
+		unsafe {
+			user32::ShowWindow(self.get_hwnd(), 0);
+		}
+	}
+	
+	fn set_text(&self, txt : &str) {
+		unsafe {
+			user32::SendMessageW(self.get_hwnd(), winapi::WM_SETTEXT, 0, to_wchar(txt).as_ptr() as winapi::LPARAM);
+		}
+	}
+}
+
+impl Window for winapi::HWND {
+	fn get_hwnd(&self) -> winapi::HWND {
+		return *self;
+	}
+}
+
 fn main() {
 	unsafe {
 		let class_name = "HOWL";
@@ -180,8 +186,12 @@ fn main() {
 			.size(95, 50)
 			.parent(wnd)
 			.create();
-
-		user32::ShowWindow(wnd, 5);
+		
+		//user32::ShowWindow(wnd, 5);
+		wnd.show();
+		wnd.show();
+		
+		btn.set_text("I am changed");
 		
 	    let mut message = winapi::MSG {
 	        hwnd: ptr::null_mut(),
