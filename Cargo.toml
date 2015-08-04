@@ -7,3 +7,4 @@ authors = ["Bibhas Bhattacharya <bibhas2@gmail.com>"]
 user32-sys = "*"
 kernel32-sys = "*"
 winapi = "*"
+libc = "*"

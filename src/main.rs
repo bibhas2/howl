@@ -1,6 +1,7 @@
 extern crate kernel32;
 extern crate user32;
 extern crate winapi;
+extern crate libc;
 
 use std::ptr;
 use std::ffi::OsStr;
@@ -175,16 +176,18 @@ pub trait Window {
 			user32::SendMessageW(self.get_hwnd(), winapi::WM_SETTEXT, 0, to_wchar(txt).as_ptr() as winapi::LPARAM);
 		}
 	}
-	
-	fn on_command(&self, source_id: u16, command_type: u16) {
+}
+
+pub trait WindowEventHandler {	
+	fn on_command(&mut self, source_id: u16, command_type: u16) {
 		println!("Window got command from: {}.", source_id);
 	}
 	
-	fn on_size(&self, width: u16, height: u16) {
+	fn on_size(&mut self, width: u16, height: u16) {
 		println!("Window resized. {} {}.", width, height);
 	}
 
-	fn on_event(&self, message : winapi::UINT,  w_param : winapi::WPARAM,  l_param : winapi::LPARAM) -> bool {
+	fn on_event(&mut self, message : winapi::UINT,  w_param : winapi::WPARAM,  l_param : winapi::LPARAM) -> bool {
 		//println!("Message received: {}", message);
 		
 		match message {
@@ -203,6 +206,26 @@ pub trait Window {
 	}
 }
 
+pub struct EventBridge {
+	event_handler: Option<*mut WindowEventHandler>
+}
+
+extern "system" {
+ fn SetPropW(hWnd: winapi::HWND, lpString: winapi::LPCWSTR, hData: *mut EventBridge) -> winapi::BOOL;
+}
+
+impl EventBridge {
+	pub fn register(&mut self, wnd : winapi::HWND, handler : *mut WindowEventHandler) {
+		let prop = to_wchar("cwnd");
+		unsafe {
+			SetPropW(wnd, prop.as_ptr(), self);
+		}
+		let handler : *mut WindowEventHandler = handler;
+		
+		self.event_handler = Some(handler);
+	}
+}
+
 impl Window for winapi::HWND {
 	fn get_hwnd(&self) -> winapi::HWND {
 		return *self;
@@ -215,11 +238,73 @@ unsafe extern "system" fn wnd_proc(
     w_param: winapi::WPARAM,
     l_param: winapi::LPARAM) -> winapi::LRESULT {
 	
-    if window.on_event(message, w_param, l_param) {
-		return 0;
+	println!("wnd_proc called");
+	
+	unsafe {
+		let prop = to_wchar("cwnd");
+		let raw_ptr = user32::GetPropW(window, prop.as_ptr());
+		let bridge  = raw_ptr as *mut EventBridge;
+		
+		if raw_ptr.is_null() || (*bridge).event_handler.is_none() {
+			return user32::DefWindowProcW(window, message, w_param, l_param);
+		}
+				
+	    if (*(*bridge).event_handler.unwrap()).on_event(message, w_param, l_param) {
+			return 0;
+		}
 	}
 	
     return user32::DefWindowProcW(window, message, w_param, l_param);
+}
+
+pub struct MyMainWindow {
+	window: winapi::HWND,
+	button: winapi::HWND,
+	is_shown: bool
+}
+
+impl WindowEventHandler for MyMainWindow {
+	fn on_command(&mut self, source_id: u16, command_type: u16) {
+		println!("MyMainWindow got command from: {}.", source_id);
+		if source_id == 10 {
+			if self.is_shown {
+				self.button.hide();
+			} else {
+				self.button.show();
+			}
+			self.is_shown = !self.is_shown;
+		}
+	}	
+}
+
+impl MyMainWindow {
+	pub fn new() -> MyMainWindow {
+		let wnd = WindowBuilder::new()
+			.frame("My Main Window")
+			.size(500, 500)
+			.create();
+		let btn = WindowBuilder::new()
+			.checkbox("Show")
+			.position(10, 10)
+			.size(95, 20)
+			.parent(wnd)
+			.id(10)
+			.create();
+		
+		let btn = WindowBuilder::new()
+			.button("Press me")
+			.position(10, 40)
+			.size(95, 50)
+			.parent(wnd)
+			.id(20)
+			.create();
+			
+		MyMainWindow {
+			window: wnd,
+			button: btn,
+			is_shown: true
+		}
+	}
 }
 
 fn main() {
@@ -227,24 +312,16 @@ fn main() {
 		let class_name = "HOWL";
 		register_class(class_name, Some(wnd_proc));
 		
-		let wnd = WindowBuilder::new()
-			.frame("Cool World")
-			.size(500, 500)
-			.create();
+		let mut bridge = EventBridge {
+			event_handler: None
+		};
 		
-		let btn = WindowBuilder::new()
-			.checkbox("Press me")
-			.position(10, 10)
-			.size(95, 50)
-			.parent(wnd)
-			.id(10)
-			.create();
+		let mut wnd = MyMainWindow::new();
 		
-		//user32::ShowWindow(wnd, 5);
-		wnd.show();
-		wnd.show();
+		wnd.window.show();
+		wnd.window.set_text("Updated title");
 		
-		btn.set_text("I am changed");
+		bridge.register(wnd.window, &mut wnd);
 		
 	    let mut message = winapi::MSG {
 	        hwnd: ptr::null_mut(),
