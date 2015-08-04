@@ -206,29 +206,45 @@ pub trait WindowEventHandler {
 	}
 }
 
-pub struct EventBridge {
+impl Window for winapi::HWND {
+	fn get_hwnd(&self) -> winapi::HWND {
+		return *self;
+	}
+}
+
+pub struct MainWindow {
+	window: winapi::HWND,
 	event_handler: Option<*mut WindowEventHandler>
 }
 
 extern "system" {
- fn SetPropW(hWnd: winapi::HWND, lpString: winapi::LPCWSTR, hData: *mut EventBridge) -> winapi::BOOL;
+ fn SetPropW(hWnd: winapi::HWND, lpString: winapi::LPCWSTR, hData: *mut MainWindow) -> winapi::BOOL;
 }
 
-impl EventBridge {
-	pub fn register(&mut self, wnd : winapi::HWND, handler : *mut WindowEventHandler) {
+impl MainWindow {
+	pub fn new() -> Box<MainWindow> {
+		let wnd = WindowBuilder::new()
+				.frame("My Main Window")
+				.size(500, 500)
+				.create();
 		let prop = to_wchar("cwnd");
+		
+		let mut main_wnd = Box::new(MainWindow {
+			window: wnd,
+			event_handler: None
+		});
+		
 		unsafe {
-			SetPropW(wnd, prop.as_ptr(), self);
+			SetPropW(wnd, prop.as_ptr(), &mut *main_wnd);
 		}
+		
+		return main_wnd;
+	}
+	
+	pub fn set_handler(&mut self, handler : *mut WindowEventHandler) {
 		let handler : *mut WindowEventHandler = handler;
 		
 		self.event_handler = Some(handler);
-	}
-}
-
-impl Window for winapi::HWND {
-	fn get_hwnd(&self) -> winapi::HWND {
-		return *self;
 	}
 }
 
@@ -243,7 +259,7 @@ unsafe extern "system" fn wnd_proc(
 	unsafe {
 		let prop = to_wchar("cwnd");
 		let raw_ptr = user32::GetPropW(window, prop.as_ptr());
-		let bridge  = raw_ptr as *mut EventBridge;
+		let bridge  = raw_ptr as *mut MainWindow;
 		
 		if raw_ptr.is_null() || (*bridge).event_handler.is_none() {
 			return user32::DefWindowProcW(window, message, w_param, l_param);
@@ -258,7 +274,7 @@ unsafe extern "system" fn wnd_proc(
 }
 
 pub struct MyMainWindow {
-	window: winapi::HWND,
+	main_window: Box<MainWindow>,
 	button: winapi::HWND,
 	is_shown: bool
 }
@@ -278,16 +294,13 @@ impl WindowEventHandler for MyMainWindow {
 }
 
 impl MyMainWindow {
-	pub fn new() -> MyMainWindow {
-		let wnd = WindowBuilder::new()
-			.frame("My Main Window")
-			.size(500, 500)
-			.create();
+	pub fn new() -> Box<MyMainWindow> {
+		let mut wnd = MainWindow::new();
 		let btn = WindowBuilder::new()
 			.checkbox("Show")
 			.position(10, 10)
 			.size(95, 20)
-			.parent(wnd)
+			.parent(wnd.window)
 			.id(10)
 			.create();
 		
@@ -295,15 +308,19 @@ impl MyMainWindow {
 			.button("Press me")
 			.position(10, 40)
 			.size(95, 50)
-			.parent(wnd)
+			.parent(wnd.window)
 			.id(20)
 			.create();
-			
-		MyMainWindow {
-			window: wnd,
+		
+		let mut w = Box::new(MyMainWindow {
+			main_window: wnd,
 			button: btn,
 			is_shown: true
-		}
+		});
+		
+		w.main_window.set_handler(&mut *w);
+		
+		return w;
 	}
 }
 
@@ -312,16 +329,10 @@ fn main() {
 		let class_name = "HOWL";
 		register_class(class_name, Some(wnd_proc));
 		
-		let mut bridge = EventBridge {
-			event_handler: None
-		};
-		
 		let mut wnd = MyMainWindow::new();
 		
-		wnd.window.show();
-		wnd.window.set_text("Updated title");
-		
-		bridge.register(wnd.window, &mut wnd);
+		wnd.main_window.window.show();
+		//wnd.window.set_text("Updated title");
 		
 	    let mut message = winapi::MSG {
 	        hwnd: ptr::null_mut(),
