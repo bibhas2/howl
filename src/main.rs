@@ -22,13 +22,15 @@ extern "system" {
 }
 */
 
-unsafe fn get_instance() -> winapi::HINSTANCE {
-    let instance = kernel32::GetModuleHandleW(ptr::null());
-    if instance.is_null() {
+fn get_instance() -> winapi::HINSTANCE {
+    unsafe {
+        let instance = kernel32::GetModuleHandleW(ptr::null());
+        if !instance.is_null() {
+            return instance;
+        }
+
         panic!("GetModuleHandleW error: {}", kernel32::GetLastError());
     }
-
-    instance
 }
 
 unsafe extern "system" fn wnd_proc(
@@ -67,7 +69,12 @@ unsafe extern "system" fn wnd_proc(
 struct Application;
 
 impl Application {
-    unsafe fn register_class(class_name : &str, wnd_proc: winapi::WNDPROC) {
+    fn init() {
+        let class_name = "HOWL";
+
+        Application::register_class(class_name, Some(wnd_proc));
+    }
+    fn register_class(class_name : &str, wnd_proc: winapi::WNDPROC) {
         let class = winapi::WNDCLASSW {
             style: winapi::CS_HREDRAW | winapi::CS_VREDRAW | winapi::CS_DBLCLKS,
             lpfnWndProc: wnd_proc,
@@ -80,9 +87,11 @@ impl Application {
             lpszMenuName: ptr::null_mut(),
             lpszClassName: to_wchar(class_name).as_ptr()
         };
-        let atom = user32::RegisterClassW(&class);
-        if atom == 0 {
-            panic!("RegisterClassW error: {}", kernel32::GetLastError());
+        unsafe {
+            let atom = user32::RegisterClassW(&class);
+            if atom == 0 {
+                panic!("RegisterClassW error: {}", kernel32::GetLastError());
+            }
         }
     }
 
@@ -356,8 +365,7 @@ impl MyMainWindow {
 
 fn main() {
 	unsafe {
-		let class_name = "HOWL";
-		Application::register_class(class_name, Some(wnd_proc));
+		Application::init();
 
 		let mut wnd = MyMainWindow::new();
         wnd.main_window.attach_event_handler(&wnd);
