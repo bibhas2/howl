@@ -16,13 +16,6 @@ pub fn to_wchar(str : &str) -> Vec<u16> {
     OsStr::new(str).encode_wide().chain(Some(0).into_iter()).collect()
 }
 
-/*
-extern "system" {
- fn SetPropW(hWnd: winapi::HWND, lpString: winapi::LPCWSTR, hData: *mut MainWindow) -> winapi::BOOL;
-}
-*/
-
-
 unsafe extern "system" fn wnd_proc(
     window: winapi::HWND,
     message: winapi::UINT,
@@ -31,27 +24,11 @@ unsafe extern "system" fn wnd_proc(
 
 	println!("wnd_proc called for HWND: {}", window as i32);
 
-	unsafe {
-		let prop = to_wchar("cwnd.data");
-		let data = user32::GetPropW(window, prop.as_ptr());
-        let prop = to_wchar("cwnd.vtable");
-		let vtable = user32::GetPropW(window, prop.as_ptr());
-
-        if data == ptr::null_mut() || vtable == ptr::null_mut() {
-            println!("wnd_proc Can not find attached data for HWND: {}.", window as i32);
-            return user32::DefWindowProcW(window, message, w_param, l_param);
-        }
-
-        let synthesized: &mut WindowEventHandler =
-            mem::transmute(raw::TraitObject {
-             data: data as *const _ as *mut (),
-             vtable: vtable as *const _ as *mut ()
-            });
-
-        if synthesized.on_event(message, w_param, l_param) {
+    if let Some(handler) = window.get_event_handler() {
+        if handler.on_event(message, w_param, l_param) {
 		    return 0;
 	    }
-	}
+    }
 
     return user32::DefWindowProcW(window, message, w_param, l_param);
 }
@@ -275,6 +252,28 @@ pub trait Window {
     fn detach_event_handler(&mut self) {
         unsafe {
 
+        }
+    }
+
+    fn get_event_handler(&self) -> Option<&mut WindowEventHandler> {
+        unsafe {
+            let prop = to_wchar("cwnd.data");
+            let data = user32::GetPropW(self.get_hwnd(), prop.as_ptr());
+            let prop = to_wchar("cwnd.vtable");
+            let vtable = user32::GetPropW(self.get_hwnd(), prop.as_ptr());
+
+            if data == ptr::null_mut() || vtable == ptr::null_mut() {
+                println!("wnd_proc Can not find attached data for HWND: {}.", self.get_hwnd() as i32);
+                return None;
+            }
+
+            let synthesized: &mut WindowEventHandler =
+                mem::transmute(raw::TraitObject {
+                 data: data as *const _ as *mut (),
+                 vtable: vtable as *const _ as *mut ()
+                });
+
+            return Some(synthesized);
         }
     }
 }
