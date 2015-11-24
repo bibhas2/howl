@@ -33,6 +33,19 @@ unsafe extern "system" fn wnd_proc(
     return user32::DefWindowProcW(window, message, w_param, l_param);
 }
 
+unsafe extern "system" fn timer_proc(
+    window: winapi::HWND,
+    message: winapi::UINT,
+    id: winapi::UINT_PTR,
+    not_used: winapi::DWORD) {
+
+	println!("timer_proc called for HWND: {}", window as i32);
+
+    if let Some(handler) = window.get_event_handler() {
+        handler.on_timer(window, id as usize);
+    }
+}
+
 struct Application;
 static mut continue_loop: bool = false;
 
@@ -289,6 +302,17 @@ pub trait Window {
             return Some(synthesized);
         }
     }
+
+    fn set_timer(&mut self, id : usize, interval : usize) {
+        unsafe {
+            user32::SetTimer(self.get_hwnd(), id as winapi::UINT_PTR, interval as winapi::UINT, Some(timer_proc));
+        }
+    }
+    fn kill_timer(&mut self, id : usize) {
+        unsafe {
+            user32::KillTimer(self.get_hwnd(), id as winapi::UINT_PTR);
+        }
+    }
 }
 
 impl Window for winapi::HWND {
@@ -317,6 +341,10 @@ pub trait WindowEventHandler {
     fn on_destroy(&mut self) {
 		println!("Window destroyed.");
 	}
+
+    fn on_timer(&mut self, window: winapi::HWND, id : usize) {
+        println!("Timer fired.");
+    }
 
 	fn on_event(&mut self, window: winapi::HWND, message : winapi::UINT,  w_param : winapi::WPARAM, l_param : winapi::LPARAM) -> bool {
 		match message {
@@ -406,7 +434,7 @@ fn main() {
 	Application::init();
 
 	let mut wnd = MyMainWindow::new();
-    
+
     wnd.main_window.attach_event_handler(&wnd);
 	wnd.main_window.show();
 
