@@ -1,15 +1,26 @@
+#![feature(raw)]
+
 extern crate kernel32;
 extern crate user32;
 extern crate winapi;
 extern crate libc;
 
+
 use std::ptr;
 use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
+use std::mem;
+use std::raw;
 
 pub fn to_wchar(str : &str) -> Vec<u16> {
-    OsStr::new(str).encode_wide(). chain(Some(0).into_iter()).collect()
+    OsStr::new(str).encode_wide().chain(Some(0).into_iter()).collect()
 }
+
+/*
+extern "system" {
+ fn SetPropW(hWnd: winapi::HWND, lpString: winapi::LPCWSTR, hData: *mut MainWindow) -> winapi::BOOL;
+}
+*/
 
 unsafe fn get_instance() -> winapi::HINSTANCE {
     let instance = kernel32::GetModuleHandleW(ptr::null());
@@ -20,22 +31,84 @@ unsafe fn get_instance() -> winapi::HINSTANCE {
     instance
 }
 
-unsafe fn register_class(class_name : &str, wnd_proc: winapi::WNDPROC) {
-    let class = winapi::WNDCLASSW {
-        style: winapi::CS_HREDRAW | winapi::CS_VREDRAW | winapi::CS_DBLCLKS,
-        lpfnWndProc: wnd_proc,
-        cbClsExtra: 0,
-        cbWndExtra: 0,
-        hInstance: get_instance(),
-        hIcon: ptr::null_mut(),
-        hCursor: ptr::null_mut(),
-        hbrBackground: winapi::COLOR_WINDOW as winapi::HBRUSH,
-        lpszMenuName: ptr::null_mut(),
-        lpszClassName: to_wchar(class_name).as_ptr()
-    };
-    let atom = user32::RegisterClassW(&class);
-    if atom == 0 {
-        panic!("RegisterClassW error: {}", kernel32::GetLastError());
+unsafe extern "system" fn wnd_proc(
+    window: winapi::HWND,
+    message: winapi::UINT,
+    w_param: winapi::WPARAM,
+    l_param: winapi::LPARAM) -> winapi::LRESULT {
+
+	println!("wnd_proc called for HWND: {}", window as i32);
+
+	unsafe {
+		let prop = to_wchar("cwnd.data");
+		let data = user32::GetPropW(window, prop.as_ptr());
+        let prop = to_wchar("cwnd.vtable");
+		let vtable = user32::GetPropW(window, prop.as_ptr());
+
+        if data == ptr::null_mut() || vtable == ptr::null_mut() {
+            println!("wnd_proc Can not find attached data for HWND: {}.", window as i32);
+            return user32::DefWindowProcW(window, message, w_param, l_param);
+        }
+
+        let synthesized: &mut WindowEventHandler =
+            mem::transmute(raw::TraitObject {
+             data: data as *const _ as *mut (),
+             vtable: vtable as *const _ as *mut ()
+            });
+
+        if synthesized.on_event(message, w_param, l_param) {
+		    return 0;
+	    }
+	}
+
+    return user32::DefWindowProcW(window, message, w_param, l_param);
+}
+
+struct Application;
+
+impl Application {
+    unsafe fn register_class(class_name : &str, wnd_proc: winapi::WNDPROC) {
+        let class = winapi::WNDCLASSW {
+            style: winapi::CS_HREDRAW | winapi::CS_VREDRAW | winapi::CS_DBLCLKS,
+            lpfnWndProc: wnd_proc,
+            cbClsExtra: 0,
+            cbWndExtra: 0,
+            hInstance: get_instance(),
+            hIcon: ptr::null_mut(),
+            hCursor: ptr::null_mut(),
+            hbrBackground: winapi::COLOR_WINDOW as winapi::HBRUSH,
+            lpszMenuName: ptr::null_mut(),
+            lpszClassName: to_wchar(class_name).as_ptr()
+        };
+        let atom = user32::RegisterClassW(&class);
+        if atom == 0 {
+            panic!("RegisterClassW error: {}", kernel32::GetLastError());
+        }
+    }
+
+    fn main_loop() {
+        let mut message = winapi::MSG {
+            hwnd: ptr::null_mut(),
+            message: 0,
+            wParam: 0,
+            lParam: 0,
+            time: 0,
+            pt: winapi::POINT {
+                x: 0,
+                y: 0
+            }
+        };
+        loop {
+            unsafe {
+                let status = user32::GetMessageW(&mut message, ptr::null_mut(), 0, 0);
+                if status == 0 {
+                    break;
+                }
+
+                user32::TranslateMessage(&message);
+                user32::DispatchMessageW(&message);
+            }
+        }
     }
 }
 
@@ -69,55 +142,55 @@ impl <'a> WindowBuilder<'a> {
 	}
 	pub fn style(&'a mut self, style: winapi::DWORD) -> &mut WindowBuilder {
 		self.style = style;
-		
+
 		self
 	}
 	pub fn extra_style(&'a mut self, extra_style: winapi::DWORD) -> &mut WindowBuilder {
 		self.extra_style = extra_style;
-		
+
 		self
 	}
 	pub fn parent(&'a mut self, parent: winapi::HWND) -> &mut WindowBuilder {
 		self.parent = parent;
-		
+
 		self
 	}
 	pub fn position(&'a mut self, x: i32, y: i32) -> &mut WindowBuilder {
 		self.x = x;
 		self.y = y;
-		
+
 		self
 	}
 	pub fn size(&'a mut self, width: i32, height: i32) -> &mut WindowBuilder {
 		self.width = width;
 		self.height = height;
-		
+
 		self
 	}
-	
+
 	pub fn id(&'a mut self, id: u16) -> &mut WindowBuilder {
 		self.id = id;
-		
+
 		self
 	}
 
 	pub fn class_name(&'a mut self, class_name: &'a str) -> &mut WindowBuilder {
 		self.class_name = class_name;
-		
+
 		self
 	}
 	pub fn title(&'a mut self, title: &'a str) -> &mut WindowBuilder {
 		self.title = title;
-		
+
 		self
 	}
-	
+
 	pub fn button(&'a mut self, title: &'a str) -> &mut WindowBuilder {
 		self.title(title)
 		.class_name("BUTTON")
 		.style(winapi::WS_VISIBLE | winapi::WS_TABSTOP | winapi::WS_CHILD | winapi::BS_PUSHBUTTON)
 	}
-	
+
 	pub fn checkbox(&'a mut self, title: &'a str) -> &mut WindowBuilder {
 		self.title(title)
 		.class_name("BUTTON")
@@ -131,7 +204,7 @@ impl <'a> WindowBuilder<'a> {
 		.extra_style(winapi::WS_EX_CLIENTEDGE)
 	}
 
-	pub fn create(&self) -> winapi::HWND {		
+	pub fn create(&self) -> winapi::HWND {
 		unsafe {
 		    let window =  user32::CreateWindowExW(
 		        self.extra_style,
@@ -146,19 +219,19 @@ impl <'a> WindowBuilder<'a> {
 		        self.id as winapi::HMENU,
 		        get_instance(),
 		        ptr::null_mut());
-				
+
 		    if window.is_null() {
 		        panic!("CreateWindowExW error: {}", kernel32::GetLastError());
 		    }
-		
-		    window	
+
+		    window
 		}
 	}
 }
 
 pub trait Window {
 	fn get_hwnd(&self) -> winapi::HWND;
-	
+
 	fn show(&self) {
 		unsafe {
 			user32::ShowWindow(self.get_hwnd(), 5);
@@ -170,26 +243,49 @@ pub trait Window {
 			user32::ShowWindow(self.get_hwnd(), 0);
 		}
 	}
-	
+
 	fn set_text(&self, txt : &str) {
 		unsafe {
 			user32::SendMessageW(self.get_hwnd(), winapi::WM_SETTEXT, 0, to_wchar(txt).as_ptr() as winapi::LPARAM);
 		}
 	}
+
+    fn attach_event_handler(&self, handler: &WindowEventHandler) {
+        unsafe {
+            let raw_obj: raw::TraitObject = mem::transmute(handler);
+
+            let prop = to_wchar("cwnd.data");
+            user32::SetPropW(self.get_hwnd(), prop.as_ptr(), raw_obj.data as *mut libc::c_void);
+            let prop = to_wchar("cwnd.vtable");
+            user32::SetPropW(self.get_hwnd(), prop.as_ptr(), raw_obj.vtable as *mut libc::c_void);
+        }
+    }
+
+    fn detach_event_handler(&mut self) {
+        unsafe {
+
+        }
+    }
 }
 
-pub trait WindowEventHandler {	
+impl Window for winapi::HWND {
+	fn get_hwnd(&self) -> winapi::HWND {
+		return *self;
+	}
+}
+
+pub trait WindowEventHandler {
 	fn on_command(&mut self, source_id: u16, command_type: u16) {
 		println!("Window got command from: {}.", source_id);
 	}
-	
+
 	fn on_size(&mut self, width: u16, height: u16) {
 		println!("Window resized. {} {}.", width, height);
 	}
 
 	fn on_event(&mut self, message : winapi::UINT,  w_param : winapi::WPARAM,  l_param : winapi::LPARAM) -> bool {
 		//println!("Message received: {}", message);
-		
+
 		match message {
 			winapi::WM_SIZE => {
 				self.on_size(winapi::LOWORD(l_param as winapi::DWORD), winapi::HIWORD(l_param as winapi::DWORD));
@@ -206,75 +302,8 @@ pub trait WindowEventHandler {
 	}
 }
 
-impl Window for winapi::HWND {
-	fn get_hwnd(&self) -> winapi::HWND {
-		return *self;
-	}
-}
-
-pub struct MainWindow {
-	window: winapi::HWND,
-	event_handler: Option<*mut WindowEventHandler>
-}
-
-extern "system" {
- fn SetPropW(hWnd: winapi::HWND, lpString: winapi::LPCWSTR, hData: *mut MainWindow) -> winapi::BOOL;
-}
-
-impl MainWindow {
-	pub fn new() -> Box<MainWindow> {
-		let wnd = WindowBuilder::new()
-				.frame("My Main Window")
-				.size(500, 500)
-				.create();
-		let prop = to_wchar("cwnd");
-		
-		let mut main_wnd = Box::new(MainWindow {
-			window: wnd,
-			event_handler: None
-		});
-		
-		unsafe {
-			SetPropW(wnd, prop.as_ptr(), &mut *main_wnd);
-		}
-		
-		return main_wnd;
-	}
-	
-	pub fn set_handler(&mut self, handler : *mut WindowEventHandler) {
-		let handler : *mut WindowEventHandler = handler;
-		
-		self.event_handler = Some(handler);
-	}
-}
-
-unsafe extern "system" fn wnd_proc(
-    window: winapi::HWND,
-    message: winapi::UINT,
-    w_param: winapi::WPARAM,
-    l_param: winapi::LPARAM) -> winapi::LRESULT {
-	
-	println!("wnd_proc called");
-	
-	unsafe {
-		let prop = to_wchar("cwnd");
-		let raw_ptr = user32::GetPropW(window, prop.as_ptr());
-		let bridge  = raw_ptr as *mut MainWindow;
-		
-		if raw_ptr.is_null() || (*bridge).event_handler.is_none() {
-			return user32::DefWindowProcW(window, message, w_param, l_param);
-		}
-				
-	    if (*(*bridge).event_handler.unwrap()).on_event(message, w_param, l_param) {
-			return 0;
-		}
-	}
-	
-    return user32::DefWindowProcW(window, message, w_param, l_param);
-}
-
 pub struct MyMainWindow {
-	main_window: Box<MainWindow>,
+	main_window: winapi::HWND,
 	button: winapi::HWND,
 	is_shown: bool
 }
@@ -290,36 +319,37 @@ impl WindowEventHandler for MyMainWindow {
 			}
 			self.is_shown = !self.is_shown;
 		}
-	}	
+	}
 }
 
 impl MyMainWindow {
-	pub fn new() -> Box<MyMainWindow> {
-		let mut wnd = MainWindow::new();
+	pub fn new() -> MyMainWindow {
+		let mut wnd = WindowBuilder::new()
+			.frame("My Main Window")
+			.size(200, 200)
+            .create();
 		let btn = WindowBuilder::new()
 			.checkbox("Show")
 			.position(10, 10)
 			.size(95, 20)
-			.parent(wnd.window)
+			.parent(wnd)
 			.id(10)
 			.create();
-		
+
 		let btn = WindowBuilder::new()
 			.button("Press me")
 			.position(10, 40)
 			.size(95, 50)
-			.parent(wnd.window)
+			.parent(wnd)
 			.id(20)
 			.create();
-		
-		let mut w = Box::new(MyMainWindow {
+
+		let mut w = MyMainWindow {
 			main_window: wnd,
 			button: btn,
 			is_shown: true
-		});
-		
-		w.main_window.set_handler(&mut *w);
-		
+		};
+
 		return w;
 	}
 }
@@ -327,32 +357,13 @@ impl MyMainWindow {
 fn main() {
 	unsafe {
 		let class_name = "HOWL";
-		register_class(class_name, Some(wnd_proc));
-		
+		Application::register_class(class_name, Some(wnd_proc));
+
 		let mut wnd = MyMainWindow::new();
-		
-		wnd.main_window.window.show();
-		//wnd.window.set_text("Updated title");
-		
-	    let mut message = winapi::MSG {
-	        hwnd: ptr::null_mut(),
-	        message: 0,
-	        wParam: 0,
-	        lParam: 0,
-	        time: 0,
-	        pt: winapi::POINT {
-	            x: 0,
-	            y: 0
-	        }
-	    };
-	    loop {
-	        let status = user32::GetMessageW(&mut message, ptr::null_mut(), 0, 0);
-	        if status == 0 {
-	            break;
-	        }
-	
-	        user32::TranslateMessage(&message);
-	        user32::DispatchMessageW(&message);
-	    }
-	}
+        wnd.main_window.attach_event_handler(&wnd);
+
+		wnd.main_window.show();
+
+        Application::main_loop();
+    }
 }
