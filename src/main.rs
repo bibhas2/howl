@@ -34,6 +34,7 @@ unsafe extern "system" fn wnd_proc(
 }
 
 struct Application;
+static mut continue_loop: bool = false;
 
 impl Application {
     fn init() {
@@ -86,16 +87,25 @@ impl Application {
                 y: 0
             }
         };
-        loop {
-            unsafe {
-                let status = user32::GetMessageW(&mut message, ptr::null_mut(), 0, 0);
-                if status == 0 {
-                    break;
-                }
 
-                user32::TranslateMessage(&message);
-                user32::DispatchMessageW(&message);
+        unsafe {
+            continue_loop = true;
+
+            while continue_loop {
+                    let status = user32::GetMessageW(&mut message, ptr::null_mut(), 0, 0);
+                    if status == 0 {
+                        break;
+                    }
+
+                    user32::TranslateMessage(&message);
+                    user32::DispatchMessageW(&message);
             }
+        }
+    }
+
+    fn exit_loop() {
+        unsafe {
+            continue_loop = false;
         }
     }
 }
@@ -342,6 +352,10 @@ impl WindowEventHandler for MyMainWindow {
 			self.is_shown = !self.is_shown;
 		}
 	}
+    
+    fn on_close(&mut self) {
+        Application::exit_loop();
+    }
 }
 
 impl MyMainWindow {
