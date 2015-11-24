@@ -25,7 +25,7 @@ unsafe extern "system" fn wnd_proc(
 	println!("wnd_proc called for HWND: {}", window as i32);
 
     if let Some(handler) = window.get_event_handler() {
-        if handler.on_event(message, w_param, l_param) {
+        if handler.on_event(window, message, w_param, l_param) {
 		    return 0;
 	    }
     }
@@ -261,7 +261,10 @@ pub trait Window {
 
     fn detach_event_handler(&mut self) {
         unsafe {
-
+            let prop = to_wchar("cwnd.data");
+            user32::RemovePropW(self.get_hwnd(), prop.as_ptr());
+            let prop = to_wchar("cwnd.vtable");
+            user32::RemovePropW(self.get_hwnd(), prop.as_ptr());
         }
     }
 
@@ -311,7 +314,11 @@ pub trait WindowEventHandler {
 		println!("Window closed.");
 	}
 
-	fn on_event(&mut self, message : winapi::UINT,  w_param : winapi::WPARAM,  l_param : winapi::LPARAM) -> bool {
+    fn on_destroy(&mut self) {
+		println!("Window destroyed.");
+	}
+
+	fn on_event(&mut self, window: winapi::HWND, message : winapi::UINT,  w_param : winapi::WPARAM, l_param : winapi::LPARAM) -> bool {
 		match message {
 			winapi::WM_SIZE => {
 				self.on_size(winapi::LOWORD(l_param as winapi::DWORD), winapi::HIWORD(l_param as winapi::DWORD));
@@ -324,6 +331,9 @@ pub trait WindowEventHandler {
 			},
             winapi::WM_CLOSE => {
 				self.on_close();
+			},
+            winapi::WM_DESTROY => {
+				self.on_destroy();
 			},
 			_ => {
 				return false;
@@ -352,8 +362,10 @@ impl WindowEventHandler for MyMainWindow {
 			self.is_shown = !self.is_shown;
 		}
 	}
-    
+
     fn on_close(&mut self) {
+        self.main_window.detach_event_handler();
+
         Application::exit_loop();
     }
 }
@@ -391,14 +403,12 @@ impl MyMainWindow {
 }
 
 fn main() {
-	unsafe {
-		Application::init();
+	Application::init();
 
-		let mut wnd = MyMainWindow::new();
-        wnd.main_window.attach_event_handler(&wnd);
+	let mut wnd = MyMainWindow::new();
+    
+    wnd.main_window.attach_event_handler(&wnd);
+	wnd.main_window.show();
 
-		wnd.main_window.show();
-
-        Application::main_loop();
-    }
+    Application::main_loop();
 }
