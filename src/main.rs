@@ -22,16 +22,6 @@ extern "system" {
 }
 */
 
-fn get_instance() -> winapi::HINSTANCE {
-    unsafe {
-        let instance = kernel32::GetModuleHandleW(ptr::null());
-        if !instance.is_null() {
-            return instance;
-        }
-
-        panic!("GetModuleHandleW error: {}", kernel32::GetLastError());
-    }
-}
 
 unsafe extern "system" fn wnd_proc(
     window: winapi::HWND,
@@ -74,13 +64,25 @@ impl Application {
 
         Application::register_class(class_name, Some(wnd_proc));
     }
+
+    fn get_instance() -> winapi::HINSTANCE {
+        unsafe {
+            let instance = kernel32::GetModuleHandleW(ptr::null());
+            if !instance.is_null() {
+                return instance;
+            }
+
+            panic!("GetModuleHandleW error: {}", kernel32::GetLastError());
+        }
+    }
+
     fn register_class(class_name : &str, wnd_proc: winapi::WNDPROC) {
         let class = winapi::WNDCLASSW {
             style: winapi::CS_HREDRAW | winapi::CS_VREDRAW | winapi::CS_DBLCLKS,
             lpfnWndProc: wnd_proc,
             cbClsExtra: 0,
             cbWndExtra: 0,
-            hInstance: get_instance(),
+            hInstance: Application::get_instance(),
             hIcon: ptr::null_mut(),
             hCursor: ptr::null_mut(),
             hbrBackground: winapi::COLOR_WINDOW as winapi::HBRUSH,
@@ -226,7 +228,7 @@ impl <'a> WindowBuilder<'a> {
 		        self.height,
 		        self.parent,
 		        self.id as winapi::HMENU,
-		        get_instance(),
+		        Application::get_instance(),
 		        ptr::null_mut());
 
 		    if window.is_null() {
