@@ -313,6 +313,42 @@ pub trait Window {
             user32::KillTimer(self.get_hwnd(), id as winapi::UINT_PTR);
         }
     }
+    fn message_box(&self, msg: &str) {
+        let msg = to_wchar(msg);
+        let title = to_wchar("Message");
+
+        unsafe {
+    	       user32::MessageBoxW(self.get_hwnd(), msg.as_ptr(), title.as_ptr(), winapi::MB_OK);
+        }
+    }
+    fn error_box(&self, msg: &str) {
+        let msg = to_wchar(msg);
+        let title = to_wchar("Error");
+
+        unsafe {
+    	       user32::MessageBoxW(self.get_hwnd(), msg.as_ptr(), title.as_ptr(), winapi::MB_OK | winapi::MB_ICONERROR);
+        }
+    }
+
+    fn question_box(&self, msg: &str) -> bool {
+        let msg = to_wchar(msg);
+        let title = to_wchar("Question");
+
+        unsafe {
+    	       return user32::MessageBoxW(self.get_hwnd(), msg.as_ptr(), title.as_ptr(),
+                winapi::MB_YESNO | winapi::MB_ICONQUESTION) == 6; //winapi::IDYES
+        }
+    }
+
+    fn confirm_box(&self, msg: &str) -> bool {
+        let msg = to_wchar(msg);
+        let title = to_wchar("Confirm");
+
+        unsafe {
+    	       return user32::MessageBoxW(self.get_hwnd(), msg.as_ptr(), title.as_ptr(),
+                winapi::MB_OKCANCEL | winapi::MB_ICONINFORMATION) == 1; //winapi::IDOK
+        }
+    }
 }
 
 impl Window for winapi::HWND {
@@ -388,13 +424,17 @@ impl WindowEventHandler for MyMainWindow {
 				self.button.show();
 			}
 			self.is_shown = !self.is_shown;
-		}
+		} else {
+            if self.main_window.question_box("Do you want to exit?") {
+                Application::exit_loop();
+            }
+        }
 	}
 
     fn on_close(&mut self) {
-        self.main_window.detach_event_handler();
-
-        Application::exit_loop();
+        if self.main_window.confirm_box("Do you want to exit?") {
+            Application::exit_loop();
+        }
     }
 }
 
