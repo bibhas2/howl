@@ -293,9 +293,15 @@ pub trait WindowEventHandler {
 		println!("Window resized. {} {}.", width, height);
 	}
 
-	fn on_event(&mut self, message : winapi::UINT,  w_param : winapi::WPARAM,  l_param : winapi::LPARAM) -> bool {
-		//println!("Message received: {}", message);
+    fn on_move(&mut self, x: i32, y: i32) {
+		println!("Window moved. {} {}.", x, y);
+	}
 
+    fn on_close(&mut self) {
+		println!("Window closed.");
+	}
+
+	fn on_event(&mut self, message : winapi::UINT,  w_param : winapi::WPARAM,  l_param : winapi::LPARAM) -> bool {
 		match message {
 			winapi::WM_SIZE => {
 				self.on_size(winapi::LOWORD(l_param as winapi::DWORD), winapi::HIWORD(l_param as winapi::DWORD));
@@ -303,6 +309,14 @@ pub trait WindowEventHandler {
 			},
 			winapi::WM_COMMAND => {
 				self.on_command(winapi::LOWORD(w_param as winapi::DWORD), winapi::HIWORD(w_param as winapi::DWORD));
+				return true;
+			},
+            winapi::WM_MOVE => {
+				self.on_move(winapi::GET_X_LPARAM(l_param), winapi::GET_Y_LPARAM(l_param));
+				return true;
+			},
+            winapi::WM_CLOSE => {
+				self.on_close();
 				return true;
 			},
 			_ => {
