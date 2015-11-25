@@ -370,6 +370,26 @@ pub trait WindowEventHandler {
 		println!("Window moved. {} {}.", x, y);
 	}
 
+    fn on_mouse_move(&mut self, x: i32, y: i32) {
+		println!("Mouse moved. {} {}.", x, y);
+	}
+
+    fn on_right_mouse_down(&mut self, x: i32, y: i32) {
+		println!("Right mouse down. {} {}.", x, y);
+	}
+
+    fn on_right_mouse_up(&mut self, x: i32, y: i32) {
+		println!("Right mouse up. {} {}.", x, y);
+	}
+
+    fn on_left_mouse_down(&mut self, x: i32, y: i32) {
+		println!("Left mouse down. {} {}.", x, y);
+	}
+
+    fn on_left_mouse_up(&mut self, x: i32, y: i32) {
+		println!("Left mouse up. {} {}.", x, y);
+	}
+
     fn on_close(&mut self) {
 		println!("Window closed.");
 	}
@@ -389,6 +409,21 @@ pub trait WindowEventHandler {
 			},
 			winapi::WM_COMMAND => {
 				self.on_command(winapi::LOWORD(w_param as winapi::DWORD), winapi::HIWORD(w_param as winapi::DWORD));
+			},
+            winapi::WM_MOUSEMOVE => {
+				self.on_mouse_move(winapi::GET_X_LPARAM(l_param), winapi::GET_Y_LPARAM(l_param));
+			},
+            winapi::WM_RBUTTONDOWN => {
+				self.on_right_mouse_down(winapi::GET_X_LPARAM(l_param), winapi::GET_Y_LPARAM(l_param));
+			},
+            winapi::WM_RBUTTONUP => {
+				self.on_right_mouse_up(winapi::GET_X_LPARAM(l_param), winapi::GET_Y_LPARAM(l_param));
+			},
+            winapi::WM_LBUTTONDOWN => {
+				self.on_left_mouse_down(winapi::GET_X_LPARAM(l_param), winapi::GET_Y_LPARAM(l_param));
+			},
+            winapi::WM_LBUTTONUP => {
+				self.on_left_mouse_up(winapi::GET_X_LPARAM(l_param), winapi::GET_Y_LPARAM(l_param));
 			},
             winapi::WM_MOVE => {
 				self.on_move(winapi::GET_X_LPARAM(l_param), winapi::GET_Y_LPARAM(l_param));
