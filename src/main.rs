@@ -255,6 +255,12 @@ pub trait Window {
 		}
 	}
 
+    fn resize(&self, x : i32, y : i32, width : i32, height : i32) {
+        unsafe {
+            user32::MoveWindow(self.get_hwnd(), x, y, width, height, 1);
+        }
+    }
+
 	fn set_text(&self, txt : &str) {
 		unsafe {
 			user32::SendMessageW(self.get_hwnd(), winapi::WM_SETTEXT, 0, to_wchar(txt).as_ptr() as winapi::LPARAM);
@@ -631,6 +637,9 @@ impl WindowEventHandler for MyApplication {
             Application::exit_loop();
         }
     }
+    fn on_size(&mut self, width: u16, height: u16) {
+        self.list_box.resize(10, 10, width as i32 - 20i32, height as i32 - 20i32);
+    }
 }
 
 impl MyApplication {
@@ -645,7 +654,7 @@ impl MyApplication {
 
         //lb.delete_item(2);
         lb.set_sel(1);
-        
+
 		MyApplication {
 			main_window: wnd,
 			list_box: lb
