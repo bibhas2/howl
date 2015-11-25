@@ -22,7 +22,7 @@ unsafe extern "system" fn wnd_proc(
     w_param: winapi::WPARAM,
     l_param: winapi::LPARAM) -> winapi::LRESULT {
 
-	println!("wnd_proc called for HWND: {}", window as i32);
+	//println!("wnd_proc called for HWND: {}", window as i32);
 
     if let Some(handler) = window.get_event_handler() {
         if handler.on_event(window, message, w_param, l_param) {
@@ -39,7 +39,7 @@ unsafe extern "system" fn timer_proc(
     id: winapi::UINT_PTR,
     not_used: winapi::DWORD) {
 
-	println!("timer_proc called for HWND: {}", window as i32);
+	//println!("timer_proc called for HWND: {}", window as i32);
 
     if let Some(handler) = window.get_event_handler() {
         handler.on_timer(window, id as usize);
@@ -357,6 +357,84 @@ impl Window for winapi::HWND {
 	}
 }
 
+struct Button {
+    window : winapi::HWND
+}
+
+impl Window for Button {
+    fn get_hwnd(&self) -> winapi::HWND {
+		return self.window;
+	}
+}
+
+impl Button {
+    fn new(parent: &Window, id: u16, title: &str, x: i32, y: i32, width: i32, height: i32) -> Button {
+        let wnd = WindowBuilder::new()
+            .title(title)
+            .class_name("BUTTON")
+            .style(winapi::WS_VISIBLE | winapi::WS_TABSTOP | winapi::WS_CHILD | winapi::BS_PUSHBUTTON)
+            .position(x, y)
+            .size(width, height)
+            .parent(parent.get_hwnd())
+            .id(id)
+            .create();
+        Button {
+            window: wnd
+        }
+    }
+}
+
+struct Checkbox {
+    window : winapi::HWND
+}
+
+impl Window for Checkbox {
+    fn get_hwnd(&self) -> winapi::HWND {
+		return self.window;
+	}
+}
+
+impl Checkbox {
+    fn new(parent: &Window, id: u16, title: &str, x: i32, y: i32, width: i32, height: i32) -> Checkbox {
+        let wnd = WindowBuilder::new()
+            .title(title)
+            .class_name("BUTTON")
+            .style(winapi::WS_VISIBLE | winapi::WS_TABSTOP | winapi::WS_CHILD | winapi::BS_CHECKBOX)            .position(x, y)
+            .size(width, height)
+            .parent(parent.get_hwnd())
+            .id(id)
+            .create();
+        Checkbox {
+            window: wnd
+        }
+    }
+}
+
+struct Frame {
+    window : winapi::HWND
+}
+
+impl Window for Frame {
+    fn get_hwnd(&self) -> winapi::HWND {
+		return self.window;
+	}
+}
+
+impl Frame {
+    fn new(title: &str, width: i32, height: i32) -> Frame {
+        let wnd = WindowBuilder::new()
+            .title(title)
+            .class_name("HOWL")
+            .style(winapi::WS_THICKFRAME | winapi::WS_MINIMIZEBOX | winapi::WS_MAXIMIZEBOX | winapi::WS_SYSMENU)
+    		.extra_style(winapi::WS_EX_CLIENTEDGE)
+            .size(width, height)
+            .create();
+        Frame {
+            window: wnd
+        }
+    }
+}
+
 pub trait WindowEventHandler {
 	fn on_command(&mut self, source_id: u16, command_type: u16) {
 		println!("Window got command from: {}.", source_id);
@@ -443,15 +521,15 @@ pub trait WindowEventHandler {
 	}
 }
 
-pub struct MyMainWindow {
-	main_window: winapi::HWND,
-	button: winapi::HWND,
+pub struct MyApplication {
+	main_window: Frame,
+	button: Button,
 	is_shown: bool
 }
 
-impl WindowEventHandler for MyMainWindow {
+impl WindowEventHandler for MyApplication {
 	fn on_command(&mut self, source_id: u16, command_type: u16) {
-		println!("MyMainWindow got command from: {}.", source_id);
+		println!("MyApplication got command from: {}.", source_id);
 		if source_id == 10 {
 			if self.is_shown {
 				self.button.hide();
@@ -473,45 +551,29 @@ impl WindowEventHandler for MyMainWindow {
     }
 }
 
-impl MyMainWindow {
-	pub fn new() -> MyMainWindow {
-		let mut wnd = WindowBuilder::new()
-			.frame("My Main Window")
-			.size(200, 200)
-            .create();
-		let btn = WindowBuilder::new()
-			.checkbox("Show")
-			.position(10, 10)
-			.size(95, 20)
-			.parent(wnd)
-			.id(10)
-			.create();
+impl MyApplication {
+	pub fn new() -> MyApplication {
+		let wnd = Frame::new("My Main Window", 200, 200);
 
-		let btn = WindowBuilder::new()
-			.button("Press me")
-			.position(10, 40)
-			.size(95, 50)
-			.parent(wnd)
-			.id(20)
-			.create();
+        Checkbox::new(&wnd, 10, "Show", 10, 10, 95, 20);
 
-		let mut w = MyMainWindow {
+		let btn = Button::new(&wnd, 20, "Press me", 10, 40, 95, 50);
+
+		MyApplication {
 			main_window: wnd,
 			button: btn,
 			is_shown: true
-		};
-
-		return w;
+		}
 	}
 }
 
 fn main() {
 	Application::init();
 
-	let mut wnd = MyMainWindow::new();
+	let my_app = MyApplication::new();
 
-    wnd.main_window.attach_event_handler(&wnd);
-	wnd.main_window.show();
+    my_app.main_window.attach_event_handler(&my_app);
+	my_app.main_window.show();
 
     Application::main_loop();
 }
