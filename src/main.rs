@@ -395,7 +395,7 @@ impl Window for Checkbox {
 }
 
 impl Checkbox {
-    fn new(parent: &Window, id: u16, title: &str, x: i32, y: i32, width: i32, height: i32) -> Checkbox {
+    pub fn new(parent: &Window, id: u16, title: &str, x: i32, y: i32, width: i32, height: i32) -> Checkbox {
         let wnd = WindowBuilder::new()
             .title(title)
             .class_name("BUTTON")
@@ -406,6 +406,26 @@ impl Checkbox {
             .create();
         Checkbox {
             window: wnd
+        }
+    }
+
+    pub fn is_checked(&self) -> bool {
+        unsafe {
+            let BST_CHECKED = 1;
+            let BM_GETCHECK = 240;
+
+            return user32::SendMessageW(self.window, BM_GETCHECK, 0, 0) == BST_CHECKED;
+        }
+    }
+
+    pub fn set_checked(&self, checked : bool) {
+        unsafe {
+            let BST_CHECKED = 1;
+            let BST_UNCHECKED = 0;
+            let BM_SETCHECK = 241;
+
+            user32::SendMessageW(self.window, BM_SETCHECK,
+                if checked {BST_CHECKED} else {BST_UNCHECKED}, 0);
         }
     }
 }
@@ -524,6 +544,7 @@ pub trait WindowEventHandler {
 pub struct MyApplication {
 	main_window: Frame,
 	button: Button,
+    cb: Checkbox,
 	is_shown: bool
 }
 
@@ -537,6 +558,7 @@ impl WindowEventHandler for MyApplication {
 				self.button.show();
 			}
 			self.is_shown = !self.is_shown;
+            self.cb.set_checked(self.is_shown);
 		} else {
             if self.main_window.question_box("Do you want to exit?") {
                 Application::exit_loop();
@@ -555,13 +577,15 @@ impl MyApplication {
 	pub fn new() -> MyApplication {
 		let wnd = Frame::new("My Main Window", 200, 200);
 
-        Checkbox::new(&wnd, 10, "Show", 10, 10, 95, 20);
+        let cb = Checkbox::new(&wnd, 10, "Show", 10, 10, 95, 20);
+        cb.set_checked(true);
 
 		let btn = Button::new(&wnd, 20, "Press me", 10, 40, 95, 50);
 
 		MyApplication {
 			main_window: wnd,
 			button: btn,
+            cb: cb,
 			is_shown: true
 		}
 	}
