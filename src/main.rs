@@ -384,6 +384,80 @@ impl Button {
     }
 }
 
+pub struct ListBox {
+    window : winapi::HWND
+}
+
+impl Window for ListBox {
+    fn get_hwnd(&self) -> winapi::HWND {
+		return self.window;
+	}
+}
+
+impl ListBox {
+    pub fn new(parent: &Window, id: u16, x: i32, y: i32, width: i32, height: i32) -> ListBox {
+        let LBS_NOTIFY = 1;
+        let LBS_HASSTRINGS = 64;
+
+        let wnd = WindowBuilder::new()
+            .class_name("LISTBOX")
+            .style(winapi::WS_VISIBLE | winapi::WS_VSCROLL | winapi::WS_CHILD | LBS_NOTIFY | LBS_HASSTRINGS)
+            .position(x, y)
+            .size(width, height)
+            .parent(parent.get_hwnd())
+            .id(id)
+            .create();
+        ListBox {
+            window: wnd
+        }
+    }
+
+    pub fn add_item(&self, val : &str) {
+        let val = to_wchar(val);
+        let LB_ADDSTRING = 384;
+
+        unsafe {
+            user32::SendMessageW(self.window, LB_ADDSTRING, 0, val.as_ptr() as winapi::LPARAM);
+        }
+    }
+
+    pub fn delete_item(&self, idx : u32) {
+        let LB_DELETESTRING = 386;
+
+        unsafe {
+            user32::SendMessageW(self.window, LB_DELETESTRING, idx, 0);
+        }
+    }
+    pub fn get_item_count(&self) -> i32 {
+        let LB_GETCOUNT = 395;
+
+        unsafe {
+    	       return user32::SendMessageW(self.window, LB_GETCOUNT, 0, 0);
+        }
+    }
+    pub fn clear(&self) {
+        let LB_RESETCONTENT = 388;
+
+        unsafe {
+            user32::SendMessageW(self.window, LB_RESETCONTENT, 0, 0);
+        }
+    }
+    pub fn get_sel(&self) -> i32 {
+        let LB_GETCURSEL = 392;
+
+        unsafe {
+               return user32::SendMessageW(self.window, LB_GETCURSEL, 0, 0);
+        }
+    }
+    pub fn set_sel(&self, idx : u32) {
+        let LB_SETCURSEL = 390;
+
+        unsafe {
+            user32::SendMessageW(self.window, LB_SETCURSEL, idx, 0);
+        }
+    }
+}
+
 struct Checkbox {
     window : winapi::HWND
 }
@@ -543,27 +617,13 @@ pub trait WindowEventHandler {
 
 pub struct MyApplication {
 	main_window: Frame,
-	button: Button,
-    cb: Checkbox,
-	is_shown: bool
+	list_box: ListBox
 }
 
 impl WindowEventHandler for MyApplication {
 	fn on_command(&mut self, source_id: u16, command_type: u16) {
 		println!("MyApplication got command from: {}.", source_id);
-		if source_id == 10 {
-			if self.is_shown {
-				self.button.hide();
-			} else {
-				self.button.show();
-			}
-			self.is_shown = !self.is_shown;
-            self.cb.set_checked(self.is_shown);
-		} else {
-            if self.main_window.question_box("Do you want to exit?") {
-                Application::exit_loop();
-            }
-        }
+
 	}
 
     fn on_close(&mut self) {
@@ -577,16 +637,18 @@ impl MyApplication {
 	pub fn new() -> MyApplication {
 		let wnd = Frame::new("My Main Window", 200, 200);
 
-        let cb = Checkbox::new(&wnd, 10, "Show", 10, 10, 95, 20);
-        cb.set_checked(true);
+        let lb = ListBox::new(&wnd, 10, 10, 10, 150, 150);
 
-		let btn = Button::new(&wnd, 20, "Press me", 10, 40, 95, 50);
+        lb.add_item("Item 1");
+        lb.add_item("Item 2");
+        lb.add_item("Item 3");
 
+        //lb.delete_item(2);
+        lb.set_sel(1);
+        
 		MyApplication {
 			main_window: wnd,
-			button: btn,
-            cb: cb,
-			is_shown: true
+			list_box: lb
 		}
 	}
 }
