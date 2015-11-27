@@ -5,7 +5,6 @@ extern crate user32;
 extern crate winapi;
 extern crate libc;
 
-
 use std::ptr;
 use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
@@ -272,9 +271,9 @@ pub trait Window {
             let raw_obj: raw::TraitObject = mem::transmute(handler);
 
             let prop = to_wchar("cwnd.data");
-            user32::SetPropW(self.get_hwnd(), prop.as_ptr(), raw_obj.data as *mut libc::c_void);
+            user32::SetPropW(self.get_hwnd(), prop.as_ptr(), raw_obj.data as winapi::HANDLE);
             let prop = to_wchar("cwnd.vtable");
-            user32::SetPropW(self.get_hwnd(), prop.as_ptr(), raw_obj.vtable as *mut libc::c_void);
+            user32::SetPropW(self.get_hwnd(), prop.as_ptr(), raw_obj.vtable as winapi::HANDLE);
         }
     }
 
