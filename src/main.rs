@@ -260,10 +260,28 @@ pub trait Window {
         }
     }
 
+    fn get_text_length(&self) -> i32 {
+		unsafe {
+			return user32::SendMessageW(self.get_hwnd(), winapi::WM_GETTEXTLENGTH, 0, 0);
+		}
+	}
+
 	fn set_text(&self, txt : &str) {
 		unsafe {
 			user32::SendMessageW(self.get_hwnd(), winapi::WM_SETTEXT, 0, to_wchar(txt).as_ptr() as winapi::LPARAM);
 		}
+	}
+    
+    fn get_text(&self) -> String {
+        let size = self.get_text_length() + 1; //Win32 adds the NULL. So we need one extra space
+        let mut v : Vec<u16> = Vec::with_capacity(size as usize);
+
+		unsafe {
+            v.set_len((size - 1) as usize);
+			user32::SendMessageW(self.get_hwnd(), winapi::WM_GETTEXT, size as winapi::WPARAM, v.as_ptr() as winapi::LPARAM);
+		}
+
+        return String::from_utf16(&v[..]).unwrap();
 	}
 
     fn attach_event_handler(&self, handler: &WindowEventHandler) {
@@ -385,6 +403,63 @@ impl Button {
             .create();
         Button {
             window: wnd
+        }
+    }
+}
+
+struct Edit {
+    window : winapi::HWND
+}
+
+impl Window for Edit {
+    fn get_hwnd(&self) -> winapi::HWND {
+		return self.window;
+	}
+}
+
+impl Edit {
+    fn new(parent: &Window, x: i32, y: i32, width: i32, height: i32, multi_line:bool) -> Edit {
+        let ES_LEFT             = 0x0000;
+        let ES_CENTER           = 0x0001;
+        let ES_RIGHT            = 0x0002;
+        let ES_MULTILINE        = 0x0004;
+        let ES_UPPERCASE        = 0x0008;
+        let ES_LOWERCASE        = 0x0010;
+        let ES_PASSWORD         = 0x0020;
+        let ES_AUTOVSCROLL      = 0x0040;
+        let ES_AUTOHSCROLL      = 0x0080;
+        let ES_NOHIDESEL        = 0x0100;
+        let ES_OEMCONVERT       = 0x0400;
+        let ES_READONLY         = 0x0800;
+        let ES_WANTRETURN       = 0x1000;
+
+        let mut style : winapi::DWORD  = winapi::WS_CHILD | winapi::WS_VISIBLE;
+
+    	if multi_line {
+    		style = style | winapi::WS_VSCROLL |
+                ES_WANTRETURN | ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL;
+        }
+
+
+        let wnd = WindowBuilder::new()
+            .class_name("EDIT")
+            .style(style)
+            .position(x, y)
+            .size(width, height)
+            .parent(parent.get_hwnd())
+            .create();
+        Edit {
+            window: wnd
+        }
+    }
+}
+
+impl Edit {
+    pub fn set_read_only(&self, read_only : bool) {
+        let EM_SETREADONLY = 0x00CF;
+
+        unsafe {
+            user32::SendMessageW(self.window, EM_SETREADONLY, if read_only {1} else {0}, 0);
         }
     }
 }
@@ -622,13 +697,14 @@ pub trait WindowEventHandler {
 
 pub struct MyApplication {
 	main_window: Frame,
-	list_box: ListBox
+	list_box: ListBox,
+    edit : Edit
 }
 
 impl WindowEventHandler for MyApplication {
 	fn on_command(&mut self, source_id: u16, command_type: u16) {
 		println!("MyApplication got command from: {}.", source_id);
-
+        println!("Len: {} Text: {}", self.edit.get_text_length(), self.edit.get_text())
 	}
 
     fn on_close(&mut self) {
@@ -636,27 +712,33 @@ impl WindowEventHandler for MyApplication {
             Application::exit_loop();
         }
     }
+
     fn on_size(&mut self, width: u16, height: u16) {
-        self.list_box.resize(10, 10, width as i32 - 20i32, height as i32 - 20i32);
+        //self.list_box.resize(10, 10, width as i32 - 20i32, height as i32 - 20i32);
     }
 }
 
 impl MyApplication {
 	pub fn new() -> MyApplication {
-		let wnd = Frame::new("My Main Window", 200, 200);
+        let margin = 10;
+		let wnd = Frame::new("My Main Window", 200, 400);
 
-        let lb = ListBox::new(&wnd, 10, 10, 10, 150, 150);
+        let lb = ListBox::new(&wnd, 10, margin, margin, 200 - margin * 2, 200);
 
         lb.add_item("Item 1");
         lb.add_item("Item 2");
         lb.add_item("Item 3");
 
-        //lb.delete_item(2);
         lb.set_sel(1);
+
+        let edt = Edit::new(&wnd, margin, 200 + margin * 2, 200 - margin * 2, 50, false);
+        edt.set_text("Hello World");
+        //edt.set_read_only(true);
 
 		MyApplication {
 			main_window: wnd,
-			list_box: lb
+			list_box: lb,
+            edit: edt
 		}
 	}
 }
