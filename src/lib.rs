@@ -81,8 +81,11 @@ impl Application {
         };
         unsafe {
             let atom = user32::RegisterClassW(&class);
+            
             if atom == 0 {
-                panic!("RegisterClassW error: {}", kernel32::GetLastError());
+                if  kernel32::GetLastError() != winapi::ERROR_CLASS_ALREADY_EXISTS {
+                    panic!("RegisterClassW error: {}", kernel32::GetLastError());
+                }
             }
         }
     }
