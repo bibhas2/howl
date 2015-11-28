@@ -260,9 +260,10 @@ pub trait Window {
         }
     }
 
-    fn get_text_length(&self) -> i32 {
+    fn get_text_length(&self) -> usize {
 		unsafe {
-			return user32::SendMessageW(self.get_hwnd(), winapi::WM_GETTEXTLENGTH, 0, 0);
+			return user32::SendMessageW(self.get_hwnd(), winapi::WM_GETTEXTLENGTH, 0, 0)
+                as usize;
 		}
 	}
 
@@ -271,7 +272,7 @@ pub trait Window {
 			user32::SendMessageW(self.get_hwnd(), winapi::WM_SETTEXT, 0, to_wchar(txt).as_ptr() as winapi::LPARAM);
 		}
 	}
-    
+
     fn get_text(&self) -> String {
         let size = self.get_text_length() + 1; //Win32 adds the NULL. So we need one extra space
         let mut v : Vec<u16> = Vec::with_capacity(size as usize);
@@ -460,6 +461,18 @@ impl Edit {
 
         unsafe {
             user32::SendMessageW(self.window, EM_SETREADONLY, if read_only {1} else {0}, 0);
+        }
+    }
+
+    pub fn append_text(&self, txt : &str) {
+    	let prev_len = self.get_text_length();
+        let txt = to_wchar(txt);
+        let EM_SETSEL               = 0x00B1;
+        let EM_REPLACESEL           = 0x00C2;
+
+        unsafe {
+        	user32::SendMessageW(self.window, EM_SETSEL, prev_len as winapi::WPARAM, prev_len as winapi::LPARAM);
+        	user32::SendMessageW(self.window, EM_REPLACESEL, 0, txt.as_ptr() as winapi::LPARAM);
         }
     }
 }
@@ -697,7 +710,6 @@ pub trait WindowEventHandler {
 
 pub struct MyApplication {
 	main_window: Frame,
-	list_box: ListBox,
     edit : Edit
 }
 
@@ -714,7 +726,7 @@ impl WindowEventHandler for MyApplication {
     }
 
     fn on_size(&mut self, width: u16, height: u16) {
-        //self.list_box.resize(10, 10, width as i32 - 20i32, height as i32 - 20i32);
+        self.edit.resize(10, 10, width as i32 - 20i32, height as i32 - 20i32);
     }
 }
 
@@ -723,21 +735,13 @@ impl MyApplication {
         let margin = 10;
 		let wnd = Frame::new("My Main Window", 200, 400);
 
-        let lb = ListBox::new(&wnd, 10, margin, margin, 200 - margin * 2, 200);
-
-        lb.add_item("Item 1");
-        lb.add_item("Item 2");
-        lb.add_item("Item 3");
-
-        lb.set_sel(1);
-
-        let edt = Edit::new(&wnd, margin, 200 + margin * 2, 200 - margin * 2, 50, false);
-        edt.set_text("Hello World");
+        let edt = Edit::new(&wnd, margin, margin, 200 - margin * 2, 400, true);
+        edt.set_text("Hello World. ");
+        edt.append_text("Hello Moon.");
         //edt.set_read_only(true);
 
 		MyApplication {
 			main_window: wnd,
-			list_box: lb,
             edit: edt
 		}
 	}
