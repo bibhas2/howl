@@ -45,17 +45,17 @@ unsafe extern "system" fn timer_proc(
     }
 }
 
-struct Application;
+pub struct Application;
 static mut continue_loop: bool = false;
 
 impl Application {
-    fn init() {
+    pub fn init() {
         let class_name = "HOWL";
 
         Application::register_class(class_name, Some(wnd_proc));
     }
 
-    fn get_instance() -> winapi::HINSTANCE {
+    pub fn get_instance() -> winapi::HINSTANCE {
         unsafe {
             let instance = kernel32::GetModuleHandleW(ptr::null());
             if !instance.is_null() {
@@ -66,7 +66,7 @@ impl Application {
         }
     }
 
-    fn register_class(class_name : &str, wnd_proc: winapi::WNDPROC) {
+    pub fn register_class(class_name : &str, wnd_proc: winapi::WNDPROC) {
         let class = winapi::WNDCLASSW {
             style: winapi::CS_HREDRAW | winapi::CS_VREDRAW | winapi::CS_DBLCLKS,
             lpfnWndProc: wnd_proc,
@@ -87,7 +87,7 @@ impl Application {
         }
     }
 
-    fn main_loop() {
+    pub fn main_loop() {
         let mut message = winapi::MSG {
             hwnd: ptr::null_mut(),
             message: 0,
@@ -115,7 +115,7 @@ impl Application {
         }
     }
 
-    fn exit_loop() {
+    pub fn exit_loop() {
         unsafe {
             continue_loop = false;
         }
@@ -381,7 +381,7 @@ impl Window for winapi::HWND {
 	}
 }
 
-struct Button {
+pub struct Button {
     window : winapi::HWND
 }
 
@@ -392,7 +392,7 @@ impl Window for Button {
 }
 
 impl Button {
-    fn new(parent: &Window, id: u16, title: &str, x: i32, y: i32, width: i32, height: i32) -> Button {
+    pub fn new(parent: &Window, id: u16, title: &str, x: i32, y: i32, width: i32, height: i32) -> Button {
         let wnd = WindowBuilder::new()
             .title(title)
             .class_name("BUTTON")
@@ -408,7 +408,7 @@ impl Button {
     }
 }
 
-struct Edit {
+pub struct Edit {
     window : winapi::HWND
 }
 
@@ -419,7 +419,7 @@ impl Window for Edit {
 }
 
 impl Edit {
-    fn new(parent: &Window, x: i32, y: i32, width: i32, height: i32, multi_line:bool) -> Edit {
+    pub fn new(parent: &Window, x: i32, y: i32, width: i32, height: i32, multi_line:bool) -> Edit {
         let ES_LEFT             = 0x0000;
         let ES_CENTER           = 0x0001;
         let ES_RIGHT            = 0x0002;
@@ -453,9 +453,7 @@ impl Edit {
             window: wnd
         }
     }
-}
 
-impl Edit {
     pub fn set_read_only(&self, read_only : bool) {
         let EM_SETREADONLY = 0x00CF;
 
@@ -551,7 +549,7 @@ impl ListBox {
     }
 }
 
-struct Checkbox {
+pub struct Checkbox {
     window : winapi::HWND
 }
 
@@ -597,7 +595,7 @@ impl Checkbox {
     }
 }
 
-struct Frame {
+pub struct Frame {
     window : winapi::HWND
 }
 
@@ -608,7 +606,7 @@ impl Window for Frame {
 }
 
 impl Frame {
-    fn new(title: &str, width: i32, height: i32) -> Frame {
+    pub fn new(title: &str, width: i32, height: i32) -> Frame {
         let wnd = WindowBuilder::new()
             .title(title)
             .class_name("HOWL")
@@ -746,7 +744,7 @@ impl MyApplication {
 		}
 	}
 }
-
+/*
 fn main() {
 	Application::init();
 
@@ -757,3 +755,4 @@ fn main() {
 
     Application::main_loop();
 }
+*/
