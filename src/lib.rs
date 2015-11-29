@@ -81,7 +81,7 @@ impl Application {
         };
         unsafe {
             let atom = user32::RegisterClassW(&class);
-            
+
             if atom == 0 {
                 if  kernel32::GetLastError() != winapi::ERROR_CLASS_ALREADY_EXISTS {
                     panic!("RegisterClassW error: {}", kernel32::GetLastError());
@@ -260,6 +260,31 @@ pub trait Window {
     fn resize(&self, x : i32, y : i32, width : i32, height : i32) {
         unsafe {
             user32::MoveWindow(self.get_hwnd(), x, y, width, height, 1);
+        }
+    }
+
+    fn get_size(&self, x : &mut i32, y : &mut i32, width : &mut i32, height : &mut i32) {
+        unsafe {
+            let mut rect = winapi::RECT {
+                    top: 0, left: 0, right: 0, bottom: 0
+            };
+            user32::GetWindowRect(self.get_hwnd(), &mut rect);
+            println!("{:?}", rect);
+            *width = rect.right - rect.left;
+            *height = rect.bottom - rect.top;
+
+            let mut point = winapi::POINT {
+                x: rect.left,
+                y: rect.top
+            };
+
+            user32::MapWindowPoints(0 as winapi::HWND,
+                user32::GetParent(self.get_hwnd()),
+                &mut point as *mut winapi::POINT, 1);
+
+            *x = point.x;
+            *y = point.y;
+            println!("Mapped x: {} y: {}", *x, *y);
         }
     }
 
@@ -443,7 +468,6 @@ impl Edit {
     		style = style | winapi::WS_VSCROLL |
                 ES_WANTRETURN | ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL;
         }
-
 
         let wnd = WindowBuilder::new()
             .class_name("EDIT")

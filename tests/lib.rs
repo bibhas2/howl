@@ -1,4 +1,5 @@
 extern crate howl;
+extern crate winapi;
 
 use howl::*;
 
@@ -66,4 +67,28 @@ fn list_box_test() {
 
     lb.clear();
     assert_eq!(0, lb.get_item_count());
+}
+
+#[test]
+fn size_test() {
+    Application::init();
+
+    let mut x = 0i32;
+    let mut y = 0i32;
+    let mut width = 0i32;
+    let mut height = 0i32;
+
+    let wnd = Frame::new("My Main Window", 200, 400);
+
+    wnd.get_size(&mut x, &mut y, &mut width, &mut height);
+    assert_eq!(200, width);
+    assert_eq!(400, height);
+
+    let lb = ListBox::new(&wnd, 0, 10, 50, 100, 100);
+
+    lb.get_size(&mut x, &mut y, &mut width, &mut height);
+    assert_eq!(10, x);
+    assert_eq!(50, y);
+    assert_eq!(100, width);
+    assert_eq!(100, height);
 }
