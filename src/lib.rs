@@ -269,7 +269,7 @@ pub trait Window {
                     top: 0, left: 0, right: 0, bottom: 0
             };
             user32::GetWindowRect(self.get_hwnd(), &mut rect);
-
+            println!("size(): {:?}", rect);
             *width = rect.right - rect.left;
             *height = rect.bottom - rect.top;
         }
@@ -700,7 +700,7 @@ pub trait WindowEventHandler {
 		println!("Window got command from: {}.", source_id);
 	}
 
-	fn on_size(&mut self, width: u16, height: u16) {
+	fn on_size(&mut self, width: i32, height: i32) {
 		println!("Window resized. {} {}.", width, height);
 	}
 
@@ -749,7 +749,7 @@ pub trait WindowEventHandler {
 
         match message {
 			winapi::WM_SIZE => {
-				self.on_size(winapi::LOWORD(l_param as winapi::DWORD), winapi::HIWORD(l_param as winapi::DWORD));
+				self.on_size(winapi::LOWORD(l_param as winapi::DWORD) as i32, winapi::HIWORD(l_param as winapi::DWORD) as i32);
 			},
 			winapi::WM_COMMAND => {
 				self.on_command(winapi::LOWORD(w_param as winapi::DWORD), winapi::HIWORD(w_param as winapi::DWORD));
