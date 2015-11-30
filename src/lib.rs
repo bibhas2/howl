@@ -263,15 +263,25 @@ pub trait Window {
         }
     }
 
-    fn get_size(&self, x : &mut i32, y : &mut i32, width : &mut i32, height : &mut i32) {
+    fn size(&self, width: &mut i32, height: &mut i32) {
+        unsafe {
+            let mut rect = winapi::RECT {
+                    top: 0, left: 0, right: 0, bottom: 0
+            };
+            user32::GetWindowRect(self.get_hwnd(), &mut rect);
+
+            *width = rect.right - rect.left;
+            *height = rect.bottom - rect.top;
+        }
+    }
+
+    fn get_position(&self) -> winapi::RECT {
         unsafe {
             let mut rect = winapi::RECT {
                     top: 0, left: 0, right: 0, bottom: 0
             };
             user32::GetWindowRect(self.get_hwnd(), &mut rect);
             println!("{:?}", rect);
-            *width = rect.right - rect.left;
-            *height = rect.bottom - rect.top;
 
             let mut point = winapi::POINT {
                 x: rect.left,
@@ -282,9 +292,22 @@ pub trait Window {
                 user32::GetParent(self.get_hwnd()),
                 &mut point as *mut winapi::POINT, 1);
 
-            *x = point.x;
-            *y = point.y;
-            println!("Mapped x: {} y: {}", *x, *y);
+            rect.left = point.x;
+            rect.top = point.y;
+
+            let mut point = winapi::POINT {
+                x: rect.right,
+                y: rect.bottom
+            };
+
+            user32::MapWindowPoints(0 as winapi::HWND,
+                user32::GetParent(self.get_hwnd()),
+                &mut point as *mut winapi::POINT, 1);
+
+            rect.right = point.x;
+            rect.bottom = point.y;
+
+            return rect;
         }
     }
 
@@ -686,7 +709,7 @@ pub trait WindowEventHandler {
 	}
 
     fn on_mouse_move(&mut self, x: i32, y: i32) {
-		println!("Mouse moved. {} {}.", x, y);
+		//println!("Mouse moved. {} {}.", x, y);
 	}
 
     fn on_right_mouse_down(&mut self, x: i32, y: i32) {
@@ -717,8 +740,14 @@ pub trait WindowEventHandler {
         println!("Timer fired.");
     }
 
-	fn on_event(&mut self, window: winapi::HWND, message : winapi::UINT,  w_param : winapi::WPARAM, l_param : winapi::LPARAM) -> bool {
-		match message {
+    fn on_event(&mut self, window: winapi::HWND, message : winapi::UINT,  w_param : winapi::WPARAM, l_param : winapi::LPARAM) -> bool {
+        return self.dispatch_event(window, message,  w_param, l_param);
+    }
+
+	fn dispatch_event(&mut self, window: winapi::HWND, message : winapi::UINT,  w_param : winapi::WPARAM, l_param : winapi::LPARAM) -> bool {
+        //println!("dispatch_event called for HWND: {} message: {:?}", window as i32, message);
+
+        match message {
 			winapi::WM_SIZE => {
 				self.on_size(winapi::LOWORD(l_param as winapi::DWORD), winapi::HIWORD(l_param as winapi::DWORD));
 			},
