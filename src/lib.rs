@@ -21,7 +21,7 @@ unsafe extern "system" fn wnd_proc(
     w_param: winapi::WPARAM,
     l_param: winapi::LPARAM) -> winapi::LRESULT {
 
-	//println!("wnd_proc called for HWND: {}", window as i32);
+	//println!("wnd_proc called for HWND: {} message: {:?}", window as i32, message);
 
     if let Some(handler) = window.get_event_handler() {
         if handler.on_event(window, message, w_param, l_param) {
@@ -622,6 +622,31 @@ impl Checkbox {
     }
 }
 
+pub struct Canvas {
+    window : winapi::HWND
+}
+
+impl Window for Canvas {
+    fn get_hwnd(&self) -> winapi::HWND {
+		return self.window;
+	}
+}
+
+impl Canvas {
+    pub fn new(parent: &Window, x: i32, y: i32, width: i32, height: i32) -> Canvas {
+        let wnd = WindowBuilder::new()
+            .class_name("HOWL")
+            .parent(parent.get_hwnd())
+            .style(winapi::WS_VISIBLE | winapi::WS_CHILD)
+            .size(width, height)
+            .position(x, y)
+            .create();
+        Canvas {
+            window: wnd
+        }
+    }
+}
+
 pub struct Frame {
     window : winapi::HWND
 }
@@ -733,6 +758,7 @@ pub trait WindowEventHandler {
 	}
 }
 
+/*
 pub struct MyApplication {
 	main_window: Frame,
     edit : Edit
@@ -771,7 +797,7 @@ impl MyApplication {
 		}
 	}
 }
-/*
+
 fn main() {
 	Application::init();
 
